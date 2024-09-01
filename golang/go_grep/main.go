@@ -5,6 +5,7 @@ import (
   "bufio"
   "fmt"
   "strings"
+  "sync"
   "path/filepath"
 )
 
@@ -20,6 +21,9 @@ type searchResult struct {
   lineInfos []lineInfo
 }
 
+var wg sync.WaitGroup
+var searchResults = []searchResult{}
+
 func main() {
   if len(os.Args) != 3 {
     fmt.Println("Usage : go_grep word filepath")
@@ -32,12 +36,14 @@ func main() {
     os.Exit(1)
   }
 
-  searchResults := []searchResult{}
+  // initialize goroutines according to found files
+  wg.Add(len(filepaths))
 
   for _, v := range filepaths {
-    newSearchResult := searchResult{filepath:v, lineInfos:readFile(v)}
-    searchResults = append(searchResults, newSearchResult)
+    go gatherResults(v)
   }
+
+  wg.Wait()
 
   totalFinds := 0
   totalFiles := 0
@@ -61,6 +67,13 @@ func main() {
   fmt.Println("-------------------------------------------------")
   fmt.Printf("Found total %d matching lines from %d files\n", totalFinds, totalFiles)
   fmt.Println("-------------------------------------------------")
+  
+}
+
+func gatherResults(filepath string) {
+  newSearchResult := searchResult{filepath:filepath, lineInfos:readFile(filepath)}
+  searchResults = append(searchResults, newSearchResult)
+  wg.Done()
 }
 
 func readFile(filepath string) []lineInfo {
